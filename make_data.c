@@ -1,17 +1,14 @@
 /*
  *  make_data.c
  *  
- *
  *  Created by Duane Loh 
- *  Last update: Sun May 20 17:20:49 SGT 2012
- *  Copyright 2012 SLAC National Laboratory. All rights reserved.
- *	
+ *  Last update: Tue Jun 10 14:01:37 SGT 2014
  *
  *	To compile :
  *		gcc -03 make_data.c -lm -o make_data
  *
- *	To use (3 arguments) :
- *		./make_data mean_total_photons number_of_data mean_total_noise_var
+ *	Usage instructions:
+ *		./make_data
  *	
  *	Needs:
  *		contrast.dat (header format on line 119 of this file)
