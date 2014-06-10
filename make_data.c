@@ -44,7 +44,7 @@ double fac(int);
 int len, img_size, tomo_len, num_tomo, num_data, num_imgs, data_counter;
 double half_len, mean_total_photons, mean_intens, mean_total_noise_var, avg_noise_counter;
 double *img , *tomo, *noise, *avg_noise;
-int *single_photons, *multi_photons;
+unsigned short *single_photons, *multi_photons;
 
 int main(int argc, char* argv[])
 {
@@ -111,7 +111,7 @@ int main(int argc, char* argv[])
 	expand_image();
 
 	FILE *fp, *fps;
-	fp = fopen("data.dat" ,"w");
+	fp = fopen("data.dat" ,"wb");
 	fps = fopen("hidden_variables.dat", "w");
 	
 	double calib_signal_counter = 0.;	
@@ -206,7 +206,14 @@ int main(int argc, char* argv[])
 			}
 					
 			m_info_given_choice *= img_size;
-			fprintf(fp, "%d %d %e %d %d %e\n", num_data, (int)(num_imgs*conformation_div), mean_total_photons, len, tomo_len, m_info_given_choice);
+			fwrite(&num_data, sizeof(int), 1, fp);
+			int present_conf = (int)(num_imgs*conformation_div); 
+			fwrite(&present_conf, sizeof(int), 1, fp);
+			fwrite(&mean_total_photons, sizeof(double), 1, fp);
+			fwrite(&len, sizeof(int), 1, fp);
+			fwrite(&tomo_len, sizeof(int), 1, fp);
+			fwrite(&m_info_given_choice, sizeof(double), 1, fp);
+			//fprintf(fp,zo "%d %d %e %d %d %e\n", num_data, (int)(num_imgs*conformation_div), mean_total_photons, len, tomo_len, m_info_given_choice);
 		}
 				
 		int r0, c0, r1, c1, tomo_offset;
@@ -278,15 +285,20 @@ int main(int argc, char* argv[])
 		if(rand_choice < 0)
 			avg_noise_counter += 1.;
 							
-		fprintf(fp, "%d\n", single_len) ;
-		for(t = 0 ; t < single_len ; ++t)
-			fprintf(fp, "%d ", single_photons[t]) ;
-		fprintf(fp, "\n") ;
+		fwrite(&single_len, sizeof(*single_photons), 1, fp);
+		fwrite(single_photons, sizeof(*single_photons), single_len, fp);
+		//fprintf(fp, "%d\n", single_len) ;
+		//for(t = 0 ; t < single_len ; ++t)
+			//fprintf(fp, "%d ", single_photons[t]) ;
+		//fprintf(fp, "\n") ;
 
-		fprintf(fp, "%d\n", multi_len) ;
-		for(t = 0 ; t < multi_len ; t+=2)
-			fprintf(fp, "%d %d ", multi_photons[t], multi_photons[t+1]) ;
-		fprintf(fp, "\n\n") ;
+
+		fwrite(&multi_len, sizeof(*multi_photons), 1, fp);
+		fwrite(multi_photons, sizeof(*multi_photons), multi_len, fp);
+		//fprintf(fp, "%d\n", multi_len) ;
+		//for(t = 0 ; t < multi_len ; t+=2)
+			//fprintf(fp, "%d %d ", multi_photons[t], multi_photons[t+1]) ;
+		//fprintf(fp, "\n\n") ;
 			
 		fprintf(fps, "%d %lf %lf\n", rand_choice, gamma, fluence);
 	}

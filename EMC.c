@@ -34,7 +34,7 @@ struct global_var
 {
 	int len, tomo_len, conf_size, num_data, num_rlzt, num_background, present_conf, num_conf, num_tomo, iter, total_iter, choice_update;
 	double err, mean_total_intens, mutual_info, m_info_given_choice;
-	int **single_photon_pos, **multi_photon, *single_len, *multi_len;
+	unsigned short **single_photon_pos, **multi_photon, *single_len, *multi_len;
 	double *tomograms_in, *tomograms_out, *background_tomo, *tomograms_temp, *conf_in, *conf_out, *conf_out_wts, *p_rlzt, *cond_prob;
 }G;
 
@@ -130,11 +130,18 @@ void setup()
 	int r, c, t, d, i ;
 	
 	FILE *fptr;
-	fptr = fopen("data.dat","r");
+	fptr = fopen("data.dat","rb");
 	if(!fptr)
 		fprintf(stderr, "Where is data.dat??\n"), exit(1);
 
-	fscanf(fptr, "%d  %d  %lf  %d  %d %lf ", &G.num_data, &G.present_conf, &G.mean_total_intens, &G.len, &G.tomo_len, &G.m_info_given_choice);
+	//fscanf(fptr, "%d  %d  %lf  %d  %d %lf ", &G.num_data, &G.present_conf, &G.mean_total_intens, &G.len, &G.tomo_len, &G.m_info_given_choice);
+	fread(&G.num_data, sizeof(G.num_data), 1, fptr);
+	fread(&G.present_conf, sizeof(G.present_conf), 1, fptr);
+	fread(&G.mean_total_intens, sizeof(G.mean_total_intens), 1, fptr);
+	fread(&G.len, sizeof(G.len), 1, fptr);
+	fread(&G.tomo_len, sizeof(G.tomo_len), 1, fptr);
+	fread(&G.m_info_given_choice, sizeof(G.m_info_given_choice), 1, fptr);
+	
 	G.conf_size= G.len * G.len ;
 	G.num_tomo = 4 ;
 	G.num_rlzt = ((G.num_conf-G.num_background) * (G.num_tomo) + G.num_background);
@@ -146,15 +153,19 @@ void setup()
 	
 	for(d = 0; d < G.num_data; ++d)
 	{
-		fscanf(fptr, "%d ", &G.single_len[d]);
+		fread(&(G.single_len[d]), sizeof(*G.single_len),1,fptr);
+//		fscanf(fptr, "%d ", &G.single_len[d]);
 		G.single_photon_pos[d] = malloc(G.single_len[d] * sizeof(**G.single_photon_pos));
-		for(i = 0; i < G.single_len[d]; ++i)
-			fscanf(fptr, "%d ", &G.single_photon_pos[d][i]);
-		
-		fscanf(fptr, "%d ", &G.multi_len[d]);
+		fread((G.single_photon_pos[d]), sizeof(**G.single_photon_pos), G.single_len[d], fptr);
+//		for(i = 0; i < G.single_len[d]; ++i)
+//			fscanf(fptr, "%d ", &G.single_photon_pos[d][i]);
+
+		fread(&(G.multi_len[d]), sizeof(*G.multi_len),1,fptr);
+//		fscanf(fptr, "%d ", &G.multi_len[d]);
 		G.multi_photon[d] = malloc(G.multi_len[d] * sizeof(**G.multi_photon));
-		for(i = 0; i < G.multi_len[d]; i+=2)
-			fscanf(fptr, "%d %d ", &G.multi_photon[d][i], &G.multi_photon[d][i+1]);
+		fread((G.multi_photon[d]), sizeof(**G.multi_photon), G.multi_len[d], fptr);	
+//		for(i = 0; i < G.multi_len[d]; i+=2)
+//			fscanf(fptr, "%d %d ", &G.multi_photon[d][i], &G.multi_photon[d][i+1]);
 	}
 	
 	fclose(fptr);

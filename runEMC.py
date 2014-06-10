@@ -65,11 +65,47 @@ class runEMC(object):
 		os.system(cmd)
 		print("Iterations completed.")
 		
-	def viewResults(self):
-		
+	def viewLog(self):
+		f = open("EMC.log", 'r')
+		lines = f.readlines()
+		f.close()
+		m = re.compile('iteration \= (?P<it>\d+)\s+error \= (?P<err>[0-9.]+)\s+m_info \= (?P<mi>[0-9.]+)\s+iter_time \= (?P<t>[0-9.]+)')
+		self.log = []
+		for ll in lines:
+			g = m.search(ll)
+			if g != None:
+				self.log.append([float(g.group('it')), float(g.group('err'))])
+		self.log = N.array(self.log)
+		plt.figure()
+		plt.xlabel("iterations")
+		plt.ylabel("change in model")
+		plt.plot(self.log[:,0], self.log[:,1])
+		plt.show()
 
-	def viewData(self):
-		pass
+	def viewRecon(self, recon="latest"):
+		if recon == "latest":
+			fn = G.glob("recon*.dat")[-1]
+			print("Opening %s"%(fn))
+			d = N.fromfile(fn, sep=" ")
+		else:
+			d = N.fromfile(recon, sep=" ")
+
+		self.fg = d[:self.l*self.l].reshape(self.l,-1)
+		self.bg = d[self.l*self.l:].reshape(self.l,-1)
+		plt.figure()
+		plt.subplot(1,3,1)
+		plt.title("true signal")
+		plt.imshow(self.contrast)
+
+		plt.subplot(1,3,2)
+		plt.title("recon.\nbackg.+sig.")
+		plt.imshow(self.fg)
+		
+		plt.subplot(1,3,3)
+		plt.title("recon.\nbackg.+sig.")
+		plt.imshow(self.bg)
+		
+		plt.show()
 
 	def runExample1(self):
 		pass
@@ -95,4 +131,6 @@ class runEMC(object):
 			print("Unable to import Python Imaging Library. Creation of new Image aborted.")
 
 
+if __name__ == "__main__":
+	emc = runEMC()
 
