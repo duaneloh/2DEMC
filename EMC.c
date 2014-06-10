@@ -23,7 +23,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <assert.h>
 #include <math.h>
 
 #define NEG_MIN (-1.E-308)
