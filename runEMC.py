@@ -15,28 +15,58 @@ import matplotlib.pylab as PL
 
 class runEMC(object):
 	def __init__(self):
-		self.contrastFile = "contrast.dat"
+		if os.path.isfile("contrast.dat"):
+			tmp = N.fromfile("contrast.dat", sep=" ")
+			self.l = int(tmp[0])
+			self.numImgs = int(tmp[1])
+			self.contrast = (tmp[2:]).reshape(self.l, self.l)
+		else:
+			print("Warning: contrast.dat is missing. You'll have to make one.")
+			self.l = 50
+			self.contrast = N.random.rand(self.l, self.l)
 
-	def compile(self)	
+	def compile(self):	
 		print("Compiling make_data.c")
 		try:
-			os.system("gcc -03 make_data.c -lm -o make_data")
+			os.system("gcc -O3 make_data.c -lm -o make_data")
 		except:
 			print("Error: make_data.c was not be compiled.")
 		print("Compiling EMC.c")
 		try:
-			os.system("gcc -03 EMC.c -lm -o EMC")
+			os.system("gcc -O3 EMC.c -lm -o EMC")
 		except:
 			print("Error: EMC.c could not be compiled.")
 
-	def makeData(self):
-		pass
+	def removeBinaryObjects(self):
+		print("Removing binary: make_data")
+		try:
+			os.remove("make_data")
+		except:
+			print("Error: could not remove binary, make_data.")
+		print("Removing binary: EMC")
+		try:
+			os.remove("EMC")
+		except:
+			print("Could not remove binary, EMC.")
 
-	def EMC(self):
-		pass
-
+	def makeData(self, numData, sigNoise, bgNoise, hitRate):
+		"""
+		The number of conformations (-c flag) always defaults to here. 
+		Reconstructing with multiple conformations is possible, but breaks the examples in runEMC.py.  
+		"""
+		cmd = "./make_data -d %d -s %lf -n %lf -h %lf -c 1"%(numData, sigNoise, bgNoise, hitRate)	
+		print("Making data with the following command:\n%s"%cmd)
+		os.system(cmd)
+		print("data.dat created.")
+		
+	def EMC(self, numIter):
+		cmd = "./EMC -n %d"%(numIter)	
+		print("Running EMC with the following command:\n%s"%cmd)
+		os.system(cmd)
+		print("Iterations completed.")
+		
 	def viewResults(self):
-		pass
+		
 
 	def viewData(self):
 		pass

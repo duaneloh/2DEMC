@@ -1,11 +1,8 @@
 /*
  *  EMC.c
  *  
- *
- *  Created by Duane Loh 
- *  Last update: Sun May 20 17:20:49 SGT 2012
- *  Copyright 2012 SLAC National Laboratory. All rights reserved.
- *	
+ *  Created by N. Duane Loh 
+ *  Last update: Tue Jun 10 14:01:37 SGT 2014
  *
  *	To compile :
  *		gcc -03 EMC.c -lm -o EMC
@@ -22,7 +19,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <sys/time.h>
 #include <math.h>
 
 #define NEG_MIN (-1.E-308)
@@ -58,26 +55,40 @@ int main(int argc, char* argv[])
 	//Clean up argc input.
 	G.choice_update = 0;
 	struct timeval tv1, tv2;
-	if(argc == 2)
+	G.num_conf = 2;
+	G.num_background = 1;
+	int i;
+
+	if(argc == 1)
 	{
-		G.total_iter = atoi(argv[1]);
-		G.num_conf = 1;
+		printf("Usage instructions::\n");
+		printf("./EMC \n\t-n <num_iterations>");
+		printf("\n\t-n 100 => iterate for 100 iterations.\n");
+		return 0;
 	}
-	else if(argc == 3)
+	else if(argc > 1)
+	{
+		for(i = 0; i < argc; i++)
 		{
-		G.total_iter = atoi(argv[1]);
-		G.num_conf = atoi(argv[2]);
-		}
-	else if(argc == 4)
-	{
-		G.total_iter = atoi(argv[1]);
-		G.num_background = atoi(argv[3]);
-		G.num_conf = atoi(argv[2]) + G.num_background;
-	}
-	else
-	{
-		fprintf(stderr, "Usage: ./EMC num_iter num_conf(default=1) num_background(default=0)\n");
-		exit(1);
+			if(argv[i][0] == '-')
+			{
+				switch(argv[i][1])
+				{
+						case 'n':
+							sscanf(argv[i+1], "%d", &G.total_iter);
+							printf("number of iterations set to: %d\n", G.total_iter);
+							break;
+						/*
+						You found the Easter egg! You can reconstruction multiple conformations if you used this flag!
+						*/
+						case 'c':
+							sscanf(argv[i+1], "%d", &G.num_conf);
+							G.num_conf += G.num_background;
+							printf("num. of conformations set to: %d\n", G.num_conf);
+							break;
+				}
+			}	
+		}	
 	}
 	
 	srand(time(0));

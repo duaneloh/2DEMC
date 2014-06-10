@@ -1,11 +1,11 @@
 /*
  *  make_data.c
  *  
- *  Created by Duane Loh 
+ *  Created by N. Duane Loh 
  *  Last update: Tue Jun 10 14:01:37 SGT 2014
  *
  *	To compile :
- *		gcc -03 make_data.c -lm -o make_data
+ *		gcc -O3 make_data.c -lm -o make_data
  *
  *	Usage instructions:
  *		./make_data
