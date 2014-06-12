@@ -11,7 +11,7 @@ import numpy as N
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.pylab as PL
-
+import struct
 
 class runEMC(object):
 	def __init__(self):
@@ -33,7 +33,7 @@ class runEMC(object):
 		self.hasBackground = False
 		self.hitRate = 1.
 		self.bgLvl = 0.
-
+		self.sparseData = {}
 		#Default number of iterations
 		self.numIter = 100
 
@@ -83,16 +83,104 @@ class runEMC(object):
 		os.system(cmd)
 		print("data.dat created.")
 		
-	def sampleData(self):
+	def sampleData(self, readFrac=0.1):
 		#Check if data.dat is present
 		#Read and store the sparse data format as a dictionary
-		#View random images in this.
-		pass
-	
+		if not os.path.isfile("data.dat"):
+			print("data.dat is not present. Skipping file read.")
+			return 1
+		#Start to parse file
+		f = open("data.dat", "rb")
+		inD = f.read(32)
+		(self.num_data,) = struct.unpack('i', inD[:4])
+		(self.present_conf,) = struct.unpack('i', inD[4:8])
+		(self.mean_total_photons,) = struct.unpack('d', inD[8:16])
+		(self.len_,) = struct.unpack('i', inD[16:20])
+		(self.tomo_len,) = struct.unpack('i', inD[20:24])
+		(self.m_info_given_choice,) = struct.unpack('d', inD[24:32])
+		#Print header for sanity check
+		print("num_data: %d"%self.num_data)
+		print("present_conf: %d"%self.present_conf)
+		print("mean_total_photons: %lf"%self.mean_total_photons)
+		print("len: %d"%self.len_)
+		print("tomo_len: %d"%self.tomo_len)
+		print("m_info_given_choice: %lf"%self.m_info_given_choice)
+		#Flush out existing sparseData dictionary.
+		self.sparseData = {}
+		#Read only a fraction of images. 
+		for dNum in range(int(readFrac*self.num_data)):
+			self.sparseData[dNum] = {}
+			#Read the one photons
+			bNumOnes = f.read(2)
+			(numOnes,) = struct.unpack("H", bNumOnes)
+			bOnes = f.read(2*numOnes)
+			self.sparseData[dNum]['o'] = []
+			for o in range(numOnes):
+				(oLoc,) = struct.unpack("H", bOnes[2*o:2*(o+1)]) 
+				(self.sparseData[dNum]['o']).append(oLoc)
+			#Read the multiple photons
+			bNumMultis = f.read(2)
+			(numMultis,) = struct.unpack("H", bNumMultis)
+			bMultis = f.read(2*numMultis)
+			self.sparseData[dNum]['m'] = []
+			for m in range(numMultis/2):
+				(mLoc,) = struct.unpack("H", bMultis[4*m:4*m+2])
+				(mPh,) = struct.unpack("H", bMultis[4*m+2:4*m+4])
+				(self.sparseData[dNum]['m']).append([mLoc, mPh])
+		f.close()
+
 	def sparseToDense(self, imgSlice):
 		#Convert a slice of the sparse data for the format into a dense array
 		#This function should return an array
-		pass
+		if len(self.sparseData) == 0:
+			res = self.sampleData()
+			if res is 1:
+				return 
+		arr = N.zeros(self.len_*self.len_)
+		cD = self.sparseData[imgSlice]
+		for o in cD['o']:
+			arr[o] = 1.
+		for m in cD['m']:
+			arr[m[0]] = arr[m[1]]
+		return arr.reshape(self.len_,-1)
+
+	def showNineRandomData(self):
+		if len(self.sparseData) == 0:
+			res = self.sampleData()
+			if res is 1:
+				return 
+		keys = self.sparseData.keys()
+		from random import shuffle
+		shuffle(keys)
+		fig,ax = plt.subplots(3,3, figsize=(9,10))
+		ccmap = PL.cm.get_cmap('bone', 2)
+		for nn,kk in enumerate(keys[:9]):
+			arr = self.sparseToDense(kk)
+			plt.subplot(3,3,nn+1)
+			plt.imshow(arr, cmap=ccmap, vmax=2)	
+			plt.title("Img %d"%kk)
+		ax2 = fig.add_axes([0.95, 0.1, 0.03, 0.8])
+		cb = matplotlib.colorbar.ColorbarBase(ax2, cmap=ccmap, ticks=range(3), format='%1i')
+		plt.show()
+
+	def showAverageData(self):
+		if len(self.sparseData) == 0:
+			res = self.sampleData()
+			if res is 1:
+				return 
+		keys = self.sparseData.keys()
+		hostArr = N.zeros((self.len_,self.len_))
+		for nn,kk in enumerate(keys):
+			arr = self.sparseToDense(kk)
+			hostArr += arr
+		hostArr /= 1.*len(keys)
+		fig = plt.figure(figsize=(6,5))
+		plt.imshow(hostArr, cmap='bone')	
+		plt.title("%d-image average"%len(keys))
+		ax2 = fig.add_axes([0.90, 0.1, 0.03, 0.8])
+		plt.title("photons")
+		cb = matplotlib.colorbar.ColorbarBase(ax2, cmap='bone', ticks=N.arange(0,1,0.1))
+		plt.show()
 
 	def recon(self):
 		cmd = "./EMC -n %d"%(self.numIter)	
@@ -113,7 +201,7 @@ class runEMC(object):
 			if g != None:
 				self.log.append([float(g.group('it')), float(g.group('err'))])
 		self.log = N.array(self.log)
-		plt.figure()
+		plt.figure(figsize=(9,5))
 		plt.xlabel("iterations")
 		plt.ylabel("change in model")
 		plt.plot(self.log[:,0], self.log[:,1])
@@ -129,26 +217,26 @@ class runEMC(object):
 		if self.hasBackground:
 			self.fg = d[:self.l*self.l].reshape(self.l,-1)
 			self.bg = d[self.l*self.l:].reshape(self.l,-1)
-			plt.figure()
+			plt.figure(figsize=(9,3))
 			plt.subplot(1,3,1)
 			plt.title("true signal")
-			plt.imshow(self.contrast)
+			plt.imshow(self.contrast, cmap='bone')
 			plt.subplot(1,3,2)
 			plt.title("recon.\nbackg.+sig.")
-			plt.imshow(self.fg)
+			plt.imshow(self.fg, cmap='bone')
 			plt.subplot(1,3,3)
 			plt.title("recon.\nbackg.+sig.")
-			plt.imshow(self.bg)
+			plt.imshow(self.bg, cmap='bone')
 			plt.show()
 		else:
 			self.fg = d[:self.l*self.l].reshape(self.l,-1)
-			plt.figure()
+			plt.figure(figsize=(6,3))
 			plt.subplot(1,2,1)
 			plt.title("true signal")
-			plt.imshow(self.contrast)
+			plt.imshow(self.contrast, cmap='bone')
 			plt.subplot(1,2,2)
 			plt.title("recon. sig.")
-			plt.imshow(self.fg)
+			plt.imshow(self.fg, cmap='bone')
 			plt.show()
 
 	def viewCondProb(self):
@@ -177,6 +265,8 @@ class runEMC(object):
 		self.recon()
 		self.viewLog()
 		self.viewRecon()
+		self.showAverageData()
+		self.showNineRandomData()
 
 	def runExample(self, numPatterns=10000, numIter=100,sigLvl=10., bgLvl=10., hitRate=0.5,):
 		print("."*50)
@@ -200,6 +290,8 @@ class runEMC(object):
 		self.viewCondProb()
 		self.viewLog()
 		self.viewRecon()
+		self.showAverageData()
+		self.showNineRandomData()
 
 if __name__ == "__main__":
 	emc = runEMC()
