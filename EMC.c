@@ -52,13 +52,12 @@ void print_hitRates();
 
 int main(int argc, char* argv[])
 {
-	//Clean up argc input.
+	//Read in command line arguments and set default parameters.
 	G.choice_update = 0;
 	struct timeval tv1, tv2;
 	G.num_conf = 1;
 	G.num_background = 0;
 	int i;
-
 	if(argc == 1)
 	{
 		printf("Usage instructions::\n");
@@ -94,14 +93,12 @@ int main(int argc, char* argv[])
 			}	
 		}	
 	}
-	
 	G.num_conf += G.num_background;
 	printf("num. of conformations set to: %d\n", G.num_conf);
-
 	srand(time(0));
 	setup();
 	
-	//Compute mutual information I(omega,K)|_W and write to logfile.
+	//Initialize to solution to compute mutual information I(omega,K)|_W and write to logfile.
 	initialize_to_solution();
 	emc();
 	FILE *fp;
@@ -110,7 +107,7 @@ int main(int argc, char* argv[])
 	fclose(fp);
 	fprintf(stderr, "max m_info = %lf \n", G.mutual_info);
 
-	//Begin ab-initio reconstruction
+	//Now initialize to random model and begin ab-initio reconstruction
 	initialize_to_random();
     for(G.iter = 0; G.iter < G.total_iter; ++G.iter)
 	{
@@ -134,8 +131,8 @@ int main(int argc, char* argv[])
 
 void setup()
 {
+	//Reads photon data from "data.dat" and allocates necessary memory
 	int r, c, t, d, i ;
-	
 	FILE *fptr;
 	fptr = fopen("data.dat","rb");
 	if(!fptr)
@@ -161,18 +158,11 @@ void setup()
 	for(d = 0; d < G.num_data; ++d)
 	{
 		fread(&(G.single_len[d]), sizeof(*G.single_len),1,fptr);
-//		fscanf(fptr, "%d ", &G.single_len[d]);
 		G.single_photon_pos[d] = malloc(G.single_len[d] * sizeof(**G.single_photon_pos));
 		fread((G.single_photon_pos[d]), sizeof(**G.single_photon_pos), G.single_len[d], fptr);
-//		for(i = 0; i < G.single_len[d]; ++i)
-//			fscanf(fptr, "%d ", &G.single_photon_pos[d][i]);
-
 		fread(&(G.multi_len[d]), sizeof(*G.multi_len),1,fptr);
-//		fscanf(fptr, "%d ", &G.multi_len[d]);
 		G.multi_photon[d] = malloc(G.multi_len[d] * sizeof(**G.multi_photon));
 		fread((G.multi_photon[d]), sizeof(**G.multi_photon), G.multi_len[d], fptr);	
-//		for(i = 0; i < G.multi_len[d]; i+=2)
-//			fscanf(fptr, "%d %d ", &G.multi_photon[d][i], &G.multi_photon[d][i+1]);
 	}
 	
 	fclose(fptr);
@@ -255,7 +245,6 @@ void initialize_to_random()
             {
                 fscanf(fp, "%lf ", &tempDoub);
                 G.conf_in[p] = (((double) rand()) / RAND_MAX);
-                //G.conf_in[p] = tempDoub;
                 total_contrast += G.conf_in[p];
             }
             
@@ -272,6 +261,14 @@ void initialize_to_random()
 
 void emc()
 {
+	/*
+	G.conf_in holds compressed signal and background models.
+	In expand(): G.conf_in -> G.tomograms_in
+	In maximize(): G.tomograms_in -> G.tomograms_out
+	In compress(): G.tomograms_out -> G.conf_out
+	Then, we compute the relative change between (G_conf_in - G_conf_out) -> G.err ;
+		and set G.conf_in <- G.conf_out to prepare for the next round of emc iteration.
+	*/
 	int i;
 	double temp_double;
 	expand();
@@ -292,7 +289,6 @@ void emc()
 void expand()
 {
 	int r, c, i, j, k, l, m, md;
-	
 	for(md = 0; md < G.num_conf; md++)
 	{
 		if(md < G.num_conf-G.num_background)
@@ -315,23 +311,6 @@ void expand()
 			for(i = 0, c = G.len - 1; c >= 0; c--)
 			for(r = 0; r < G.len; r++, i++)
 				G.tomograms_in[l + (3 * G.conf_size) + i] = G.conf_in[m + (r * G.len) + c];
-/*			
-			for(i = 0, r = 0; r < G.len; r++)
-			for(c = G.len - 1; c >= 0; c--, i++)
-				G.tomograms_in[l + (4 * G.conf_size) + i] = G.conf_in[m + (r * G.len) + c];
-			
-			for(i = 0, c = 0; c < G.len; c++)
-			for(r = 0; r < G.len; r++, i++)
-				G.tomograms_in[l + (5 * G.conf_size) + i] = G.conf_in[m + (r * G.len) + c];
-			
-			for(i = 0, r = G.len - 1; r >= 0; r--)
-			for(c = 0; c < G.len; c++, i++)
-				G.tomograms_in[l + (6 * G.conf_size) + i] = G.conf_in[m + (r * G.len) + c];			
-			
-			for(i = 0, c = G.len - 1; c >= 0; c--)
-			for(r = G.len - 1; r >= 0; r--, i++)
-				G.tomograms_in[l + (7 * G.conf_size) + i] = G.conf_in[m + (r * G.len) + c];
-*/			
 		}
 		else
 		{
@@ -353,6 +332,7 @@ double maximize()
 	double info = 0.;
 	double s[G.num_rlzt], p[G.num_rlzt], p_choice_temp[G.num_rlzt], tomo_temp1[G.num_rlzt];
 	
+	//Initialize temporary variables used in reconstruction
 	for(md = 0; md < G.num_conf; md++)
 	{
 		if(md < G.num_conf-G.num_background)
@@ -389,11 +369,14 @@ double maximize()
 		}
 	}
 			
+	//For each data, compute its probability conditional on the current model tomograms.
+	//Then, update the output tomograms by maximizing the data likelihood.
 	for(d = 0; d < G.num_data; d++)
 	{
+		//Loop to compute and normalize data probability conditional on current model tomograms.
+		//Note that we only compute the log-probabilty here, and not the probabilities to prevent overflow error.
 		p_tot = 0.;
 		max_exp = -100. * G.conf_size;
-		//TODO: only operate on positive photon counts. Negative ones get incremented but not considered in conditional probability
 		for(md = 0; md < G.num_conf; md++)
 		{
 			if(md < G.num_conf-G.num_background)
@@ -423,20 +406,24 @@ double maximize()
 				
 				for(i = 0; i < G.multi_len[d]; i += 2)
 					p[k] += G.multi_photon[d][i+1] * G.tomograms_temp[j + G.multi_photon[d][i]];
-					
+				//Maximimum exponent in probability.
 				if(p[k] > max_exp)
 					max_exp = p[k];
 			}
 		}
-		
+		//Correction for overflow error.
+		//Sum p_tot across all tomograms(including background). Used later in normalization.
 		for(md = 0; md < G.num_rlzt; md++)
 		{
 			p[md] = exp(p[md]-max_exp);
 			p_tot += p[md];
 		}
 
+		//Normalize that data must be in one of the specified tomograms(including background).
+		//Update output tomograms and accumulate total conditional probability for all data to match them. 
 		for(md = 0; md < G.num_conf; md++)
 		{
+			//If NOT background.
 			if(md < G.num_conf-G.num_background)
 			{
 				for(t = 0; t < G.num_tomo; t++)
@@ -446,7 +433,8 @@ double maximize()
 					G.cond_prob[d*G.num_rlzt + k] = p[k];
 					s[k] += p[k];
 					p_choice_temp[k] += p[k];
-					if(p[k] > LOW_PROBCUTOFF) //TODO: Set a higher cutoff.
+					//Only update output tomograms if normalized conditional probability above threshold LOW_PROBCUTOFF.
+					if(p[k] > LOW_PROBCUTOFF) 
 						info += p[k] * log(p[k] / G.p_rlzt[k]);
 					else
 						continue;
@@ -458,6 +446,7 @@ double maximize()
 						G.tomograms_out[j + G.multi_photon[d][i]] += p[k] * G.multi_photon[d][i+1];
 				}
 			}
+			//If background.
 			else
 			{
 				k = ((G.num_conf-G.num_background) * G.num_tomo) + (md - (G.num_conf-G.num_background));
@@ -465,7 +454,8 @@ double maximize()
 				G.cond_prob[d*G.num_rlzt + k] = p[k];
 				s[k] += p[k];
 				p_choice_temp[k] += p[k];
-				if(p[k] > LOW_PROBCUTOFF) //TODO: Set a higher cutoff.
+				//Only update output tomograms if normalized conditional probability above threshold LOW_PROBCUTOFF.
+				if(p[k] > LOW_PROBCUTOFF) 
 					info += p[k] * log(p[k] / G.p_rlzt[k]);
 				else
 					continue;
@@ -480,7 +470,8 @@ double maximize()
 		}
 		
 	}
-	
+
+	//Normalize the output tomograms by the total probability that data "agrees with them".
 	double tot_rlzt = 0.;
 	for(md = 0; md < G.num_rlzt; md++)
 	{
@@ -502,27 +493,16 @@ double maximize()
 		}
 		fprintf(stderr, "\n");
 	}	
-	
 	info /= 1.*G.num_data;
 
-	
-/*
-	//Bypass maximization step: used to test expansion and compression. 
-	for(md = 0; md < G.num_rlzt; md++)
-	{
-		k = md * G.conf_size;
-		for(i = 0; i < G.len; ++i)
-		for(j = 0; j < G.len; ++j)
-			G.tomograms_out[k + i*G.len + j] = G.tomograms_in[k + i*G.len + j];
-	}
-*/
 	return info;
 }
 
 void compress()
 {
+	//Only orientation tomograms are rotated into canonical orientation and averaged into compressed model.
+	//Non-orientational background is simply updated into the background slice of compressed model.
 	int r, c, i, j, k, l, m, md;
-
 	for(i = 0; i < G.num_rlzt*G.conf_size; i++)
 		{
 		G.conf_out[i] = 0.;
@@ -530,6 +510,7 @@ void compress()
 		}
 	for(md = 0; md < G.num_conf; md++)
 	{
+		//Rotate output tomograms from maximization step into canonical orientation, and increment into compressed model. 
 		if(md < G.num_conf-G.num_background)
 		{
 			l = (md * G.num_tomo * G.conf_size);
@@ -574,46 +555,8 @@ void compress()
 					G.conf_out_wts[m + (r*G.len) + c] += 1.;
 				}
 			}
-/*
-			for(i = 0, r = 0; r < G.len; r++)
-			for(c = G.len - 1; c >= 0; c--, i++)
-			{
-				if(G.tomograms_out[l + (4*G.conf_size) + i] >= MINTOMOWT)
-				{
-					G.conf_out[m + (r * G.len) + c] += G.tomograms_out[l + (4*G.conf_size) + i];
-					G.conf_out_wts[m + (r*G.len) + c] += 1.;
-				}
-			}
-			
-			for(i = 0, c = 0; c < G.len; c++)
-			for(r = 0; r < G.len; r++, i++)
-			{
-				G.conf_out[m + (r * G.len) + c] += G.tomograms_out[l + (5*G.conf_size) + i];
-				if(G.tomograms_out[l + (5*G.conf_size) + i] >= MINTOMOWT)
-					G.conf_out_wts[m + (r*G.len) + c] += 1.;
-			}
-			
-			for(i = 0, r = G.len - 1; r >= 0; r--)
-			for(c = 0; c < G.len; c++, i++)
-			{
-				if(G.tomograms_out[l + (6*G.conf_size) + i] >= MINTOMOWT)
-				{
-					G.conf_out[m + (r * G.len) + c] += G.tomograms_out[l + (6*G.conf_size) + i];
-					G.conf_out_wts[m + (r*G.len) + c] += 1.;
-				}
-			}
-			
-			for(i = 0, c = G.len - 1; c >= 0; c--)
-			for(r = G.len - 1; r >= 0; r--, i++)
-			{
-				if(G.tomograms_out[l + (7*G.conf_size) + i] >= MINTOMOWT)
-				{
-					G.conf_out[m + (r * G.len) + c] += G.tomograms_out[l + (7*G.conf_size) + i];
-					G.conf_out_wts[m + (r*G.len) + c] += 1.;
-				}
-			}
-*/
 		}
+		//Update background in compressed model with output of maximization step. 
 		else
 		{
 			l = (((G.num_conf-G.num_background) * G.num_tomo) + (md-(G.num_conf-G.num_background))) * G.conf_size;
@@ -625,6 +568,7 @@ void compress()
 		}
 	}
 
+	//Normalize the compressed orientation model.
 	double norm;	
 	for(md = 0; md < G.num_conf; md++)
 	{
