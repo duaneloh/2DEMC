@@ -55,15 +55,16 @@ int main(int argc, char* argv[])
 	//Clean up argc input.
 	G.choice_update = 0;
 	struct timeval tv1, tv2;
-	G.num_conf = 2;
-	G.num_background = 1;
+	G.num_conf = 1;
+	G.num_background = 0;
 	int i;
 
 	if(argc == 1)
 	{
 		printf("Usage instructions::\n");
-		printf("./EMC \n\t-n <num_iterations>");
+		printf("./EMC \n\t-n <num_iterations> -b");
 		printf("\n\t-n 100 => iterate for 100 iterations.\n");
+		printf("\n\t-b => reconstructs a static background as well.\n");
 		return 0;
 	}
 	else if(argc > 1)
@@ -78,19 +79,25 @@ int main(int argc, char* argv[])
 							sscanf(argv[i+1], "%d", &G.total_iter);
 							printf("number of iterations set to: %d\n", G.total_iter);
 							break;
+						
+						case 'b':
+							G.num_background = 1;
+							printf("number of background types: %d\n", G.num_background);
+							break;
 						/*
 						You found the Easter egg! You can reconstruction multiple conformations if you used this flag!
 						*/
 						case 'c':
 							sscanf(argv[i+1], "%d", &G.num_conf);
-							G.num_conf += G.num_background;
-							printf("num. of conformations set to: %d\n", G.num_conf);
 							break;
 				}
 			}	
 		}	
 	}
 	
+	G.num_conf += G.num_background;
+	printf("num. of conformations set to: %d\n", G.num_conf);
+
 	srand(time(0));
 	setup();
 	
@@ -134,7 +141,6 @@ void setup()
 	if(!fptr)
 		fprintf(stderr, "Where is data.dat??\n"), exit(1);
 
-	//fscanf(fptr, "%d  %d  %lf  %d  %d %lf ", &G.num_data, &G.present_conf, &G.mean_total_intens, &G.len, &G.tomo_len, &G.m_info_given_choice);
 	fread(&G.num_data, sizeof(G.num_data), 1, fptr);
 	fread(&G.present_conf, sizeof(G.present_conf), 1, fptr);
 	fread(&G.mean_total_intens, sizeof(G.mean_total_intens), 1, fptr);
@@ -146,6 +152,7 @@ void setup()
 	G.num_tomo = 4 ;
 	G.num_rlzt = ((G.num_conf-G.num_background) * (G.num_tomo) + G.num_background);
 	fprintf(stderr, "Photon data has %d conformation(s).\nReconstructing with %d conformation(s) which includes %d background.\nHas %d data realizations.\n", G.present_conf, G.num_conf, G.num_background, G.num_rlzt);
+	fprintf(stderr, "Mutual info given orientation: %lf\n", G.m_info_given_choice); 
 	G.single_photon_pos = malloc(G.num_data * sizeof(*G.single_photon_pos));
 	G.multi_photon = malloc(G.num_data * sizeof(*G.multi_photon));
 	G.single_len = malloc(G.num_data * sizeof(*G.single_len));
@@ -739,7 +746,7 @@ void print_hitRates()
     
     
 	sprintf(output_name, "hitFractions.dat");
-	fp = fopen(output_name, "a");
+	fp = fopen(output_name, "w");
     fprintf(fp, "%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\n", hitPh, hitPhSq, blankPh, blankPhSq, hits/tot, falseHits/tot, blanks/tot, falseBlanks/tot);
 	fclose(fp);
     

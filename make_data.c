@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
 		printf("\t-d 1000 => num of data set to 1000\n");
 		printf("\t-n 100. => input noise level per data set to 100.0\n");
 		printf("\t-h 0.4  => hit rate set to 40 percent\n");
-		printf("\t-c 10	  => number of conformations set to 10\n");
+		printf("\t-c 1	  => number of conformations set to 1\n");
 
 		return 0;
 	}
@@ -106,8 +106,18 @@ int main(int argc, char* argv[])
 	}
 	
 	num_tomo = 4;
-	srand(time(0));
+	srand(time(NULL));
+	//Here we read the solution, contrast.dat, from file.  
+	//Then we initialize our arrays to the correct sizes. 
 	initialize();
+
+	/*
+	* Expand the solution into num_tomo arrays that describe the possible orientations. 
+	* To randomly pick these num_tomo arrays, to which we apply the Poisson noise sampler. 
+	* These random, noisy arrays as saved to "data.dat", and await reconstruction. 
+	* The orientations of these patterns are saved in "hidden_variables.dat", 
+	*	but unused in the reconstruction
+	*/
 	expand_image();
 
 	FILE *fp, *fps;
@@ -118,6 +128,12 @@ int main(int argc, char* argv[])
 	avg_noise_counter = 0.;
 	tot_signal_photons = 0.;
 	photon_scaling = 1.;
+	/*First CALIB_CYCLE loops are used to compute mean number of photons per pattern. 
+	* Patterns generated in this calibration cycle are not saved to file.
+	* A number of parameters are computed and saved to file when data_counter == CALIB_CYCLE.
+	* Thereafter, loops generate photon data which are saved to file.
+	* Important for intensity scaling in reconstruction. 
+	*/
 	for(data_counter = 0; data_counter < num_data+CALIB_CYCLE; ++data_counter)
 	{
 		single_len = 0; multi_len = 0;
@@ -132,8 +148,14 @@ int main(int argc, char* argv[])
 		double fluence = gaussian_dist(photon_scaling, FLUENCE_VAR);
 		if(fluence < 0.) fluence = 0.;
 
-		//Mutual information computed only once when data_counter == CALIB_CYCLE. 
-		//TODO: mutual information computation hasn't included model scaling.
+		/*
+		* The diagnostic mutual information computed only once when data_counter == CALIB_CYCLE. 
+		* This diagnostic is not essential to the success of the reconstruction, although it might 
+		* 	affect the accuracy of downstream diagnostics.  
+		* We empirically compute the average pixel's photon histograms for using PKW_INNER_CYCLE noisy patterns,
+			given the solution contrast(s) and extraneous background noise level are computed. 
+		* Possibly unreliable here when number of conformations>1.
+		*/
 		double total_prob = 0.;
 		if(data_counter == CALIB_CYCLE)
 		{
@@ -143,20 +165,13 @@ int main(int argc, char* argv[])
 				{k_hist[i] = 0.;}
 			w_hist = malloc((K_DIV*(max_photon+1)) * sizeof(*w_hist));
 			kw_hist = malloc((max_photon+1) * (K_DIV*(max_photon+1)) * sizeof(*kw_hist)); 	
-
 			m_info_given_choice = 0., m_info_given_choice_counter = 0.;
 
 			double k_hist_tot = 0., kw_hist_tot;
-			for(i = 0; i <= max_photon; i++)	
-				{k_hist_tot += k_hist[i];}
-			for(i = 0; i <= max_photon; i++)	
-				{k_hist[i] /= k_hist_tot;}
-
 			kw_hist_tot = 0.;
 			for(i = 0; i < (max_photon+1) * (K_DIV*(max_photon+1)); i++)
 				{kw_hist[i] = 0.;}
 
-			//TODO: change to random interp model?
 			for(im = 0; im < num_imgs; im++)
 			for(t = 0; t < img_size; t++)
 			{
@@ -167,8 +182,6 @@ int main(int argc, char* argv[])
 					curr_intens_pos = (int) (K_DIV * tomo[pos]);
 					curr_photon1 = poisson_dist(fluence*tomo[pos]);
 					curr_photon2 = poisson_dist(noise[r*len+c]);
-					//curr_photon1 = (curr_photon1 > 0) ? curr_photon1 : 0;
-					//curr_photon2 = (curr_photon2 > 0) ? curr_photon2 : 0;
 					curr_photon1 += curr_photon2;
 					if(curr_photon1 <= max_photon && curr_intens_pos <= K_DIV*(max_photon))
 					{
@@ -205,6 +218,7 @@ int main(int argc, char* argv[])
 				total_prob += temp;	
 			}
 					
+			//Write the computed mutual information to file.
 			m_info_given_choice *= img_size;
 			fwrite(&num_data, sizeof(int), 1, fp);
 			int present_conf = (int)(num_imgs*conformation_div); 
@@ -213,9 +227,8 @@ int main(int argc, char* argv[])
 			fwrite(&len, sizeof(int), 1, fp);
 			fwrite(&tomo_len, sizeof(int), 1, fp);
 			fwrite(&m_info_given_choice, sizeof(double), 1, fp);
-			//fprintf(fp,zo "%d %d %e %d %d %e\n", num_data, (int)(num_imgs*conformation_div), mean_total_photons, len, tomo_len, m_info_given_choice);
 		}
-				
+		
 		int r0, c0, r1, c1, tomo_offset;
 		double v0, v1, v2, v3, v_interp, dc, dr, fc, fr;
 		double curr_scale = floor( ((conformation_div*rand())/RAND_MAX) ) / conformation_div;
@@ -240,20 +253,17 @@ int main(int argc, char* argv[])
 				v_interp = fluence*(v0 + dc*dr*(v0-v1-v2+v3) + dc*(v1-v0) +dr*(v2-v0));
 				
 				curr_photon1 = poisson_dist(v_interp);
-				//curr_photon2 = 0;
 				curr_photon2 = poisson_dist(noise[r*len+c]);
-				//curr_photon1 = (curr_photon1 > 0) ? curr_photon1 : 0;
-				//curr_photon2 = (curr_photon2 > 0) ? curr_photon2 : 0;
 			}
 			else if(rand_choice == -1)
 			{
 				curr_photon1 = 0;
 				curr_photon2 = poisson_dist(noise[r*len+c]);
-				//curr_photon2 = (curr_photon2 > 0) ? curr_photon2 : 0;
 				if(data_counter >= CALIB_CYCLE)
 					avg_noise[r*len+c] += curr_photon2;
 			}
 
+			//If we are still calibrating, then store compute the total number of photons for all calibration images.
 			if(data_counter < CALIB_CYCLE)
 			{
 				if(rand_choice >= 0)
@@ -278,28 +288,19 @@ int main(int argc, char* argv[])
 				multi_photons[multi_len++] = curr_photon1;
 			}
 		}
-			
+	
+		//Skips writing to file if still calibrating.
 		if(data_counter < CALIB_CYCLE)
 			continue ;
 
 		if(rand_choice < 0)
 			avg_noise_counter += 1.;
 							
+		//Write output to file.
 		fwrite(&single_len, sizeof(*single_photons), 1, fp);
 		fwrite(single_photons, sizeof(*single_photons), single_len, fp);
-		//fprintf(fp, "%d\n", single_len) ;
-		//for(t = 0 ; t < single_len ; ++t)
-			//fprintf(fp, "%d ", single_photons[t]) ;
-		//fprintf(fp, "\n") ;
-
-
 		fwrite(&multi_len, sizeof(*multi_photons), 1, fp);
 		fwrite(multi_photons, sizeof(*multi_photons), multi_len, fp);
-		//fprintf(fp, "%d\n", multi_len) ;
-		//for(t = 0 ; t < multi_len ; t+=2)
-			//fprintf(fp, "%d %d ", multi_photons[t], multi_photons[t+1]) ;
-		//fprintf(fp, "\n\n") ;
-			
 		fprintf(fps, "%d %lf %lf\n", rand_choice, gamma, fluence);
 	}
 	
@@ -307,6 +308,7 @@ int main(int argc, char* argv[])
 	fclose(fp);
 	fclose(fps);
 		
+	//We write the randomly generated background to file.  
 	fp = fopen("background.dat", "w");
 	for(r = 0; r < len; r++)
 	{
@@ -329,6 +331,9 @@ void initialize()
 	int im, r, c, p;
 	double scale_factor, total_contrast;
 
+	//Read solution contrast from file.
+	//The number of "conformations", or num_imgs, is specified.  
+	//Memory for temporay arrays are also allocated here.
 	FILE *fptr; 
 	fptr = fopen("contrast.dat", "r");
 	if(!fptr)
@@ -367,17 +372,14 @@ void initialize()
 	
 	tomo = malloc(num_imgs * num_tomo * img_size * sizeof(*tomo));
 	
+	//The AVERAGE random, extraneous, addivitive background noise is created into noise[].
 	double noise_norm = 1., total_noise = 0., total_noise1 = 0.;	
-	total_noise = 0.;
 	for(r=0; r<len; r++)
 	for(c=0; c<len; c++)
 	{
 		noise[r*len + c] = exp_dist(mean_total_noise_var);
-		total_noise += poisson_dist(noise[r*len + c]);
 		avg_noise[r*len + c] = 0.;
 	}
-	total_noise /= (double) img_size;
-	noise_norm = mean_total_noise_var/total_noise;
 }
 	
 	
@@ -421,43 +423,6 @@ void expand_image()
 			t = (im * num_tomo * img_size) + (3 * img_size) + i;
 			tomo[t] = img[p];
 		}
-/*				
-		//Rot0, Flip1
-		for(i = 0, r = 0; r < len; ++r)
-		for(c = len - 1; c >= 0; --c, ++i)
-		{
-			p = (im * img_size) + (r * len) + c;
-			t = (im * num_tomo * img_size) + (4 * img_size) + i;
-			tomo[t] = img[p];
-		}
-		 		
-		//Rot90, Flip1
-		for(i = 0, c = 0; c < len; ++c)
-		for(r = 0; r < len; ++r, ++i)
-		{
-			p = (im * img_size) + (r * len) + c;
-			t = (im * num_tomo * img_size) + (5 * img_size) + i;
-			tomo[t] = img[p];
-		}
-
-		//Rot180, Flip1
-		for(i = 0, r = len - 1; r >= 0; --r)
-		for(c = 0; c < len; ++c, ++i)
-		{
-			p = (im * img_size) + (r * len) + c;
-			t = (im * num_tomo * img_size) + (6 * img_size) + i;
-			tomo[t] = img[p];
-		} 
-
-		//Rot270, Flip1
-		for(i = 0, c = len - 1; c >= 0; --c)
-		for(r = len - 1; r >= 0; --r, ++i)
-		{
-			p = (im * img_size) + (r * len) + c;
-			t = (im * num_tomo * img_size) + (7 * img_size) + i;
-			tomo[t] = img[p];
-		}
-*/
 	}
 }
 	
