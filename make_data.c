@@ -2,7 +2,7 @@
  *  make_data.c
  *  
  *  Created by N. Duane Loh 
- *  Last update: Tue Jun 10 14:01:37 SGT 2014
+ *  Last update: Tue Jun 12 2014
  *
  *	To compile :
  *		gcc -O3 make_data.c -lm -o make_data
@@ -11,10 +11,12 @@
  *		./make_data
  *	
  *	Needs:
- *		contrast.dat (header format on line 119 of this file)
+ *		contrast.dat (data format described in initialize())
  *
  *	Output:
- *		data.dat (header format on line 63 of this file)
+ *		data.dat (data format described in main())
+ * 		background.dat (data format described in main()) 
+ * 		hidden_variables (data format described in main())
  */
 
 #include <stdio.h>

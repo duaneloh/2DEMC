@@ -2,19 +2,28 @@
  *  EMC.c
  *  
  *  Created by N. Duane Loh 
- *  Last update: Tue Jun 10 14:01:37 SGT 2014
+ *  Last update: Tue Jun 12 2014
  *
  *	To compile :
  *		gcc -03 EMC.c -lm -o EMC
  *
- *	To use (1 argument) :
- *		./EMC num_of_iterations
+ * 	Usage instructions:
+ *		./make_data
+ *
+ *	Usage examples:
+ *		Run 100 iterations without background model
+ *			./EMC -n 100
+ *		Run 100 iterations with background model
+ *			./EMC -n 100 -b
  *	
  *	Needs: 
- *		data.dat (header format on line 94 of this file)
+ *		data.dat (binary data format described in setup())
  *
  *	Output:
- *		image.dat
+ *		EMC.log ("self describing" ASCII text file)
+ * 		reconxxx.dat (data format described in print_recon())
+ *		cond_probxxx.dat (data format described in print_recon())
+ *		hitFractions.dat (data format described in print_hitRates()) 		
  */
 
 #include <stdio.h>

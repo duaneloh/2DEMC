@@ -176,7 +176,7 @@ class runEMC(object):
 		hostArr /= 1.*len(keys)
 		fig = plt.figure(figsize=(6,5))
 		plt.imshow(hostArr, cmap='bone')	
-		plt.title("%d-image average"%len(keys))
+		plt.title("%d-image average data"%len(keys))
 		ax2 = fig.add_axes([0.90, 0.1, 0.03, 0.8])
 		plt.title("photons")
 		cb = matplotlib.colorbar.ColorbarBase(ax2, cmap='bone', ticks=N.arange(0,1,0.1))
@@ -268,10 +268,10 @@ class runEMC(object):
 		self.showAverageData()
 		self.showNineRandomData()
 
-	def runExample(self, numPatterns=10000, numIter=100,sigLvl=10., bgLvl=10., hitRate=0.5,):
+	def runExample(self, numPatterns=10000, numIter=100,sigLvl=10., bgLvl=10., hitRate=0.5, hasBackground=True):
 		print("."*50)
 		print("Running case with background.")
-		self.hasBackground = True
+		self.hasBackground = hasBackground
 		self.bgLvl = bgLvl
 		self.numPatterns = numPatterns
 		self.sigLvl = sigLvl
@@ -295,4 +295,26 @@ class runEMC(object):
 
 if __name__ == "__main__":
 	emc = runEMC()
+	if not (os.path.isfile("make_data") and os.path.isfile("EMC")):
+		emc.recompile()
 
+	try:
+		if sys.argv[1] == 'd':
+			print(("="*100+"\n")*3)
+			print("Starting with the default background-free case (Hit rate = 100%)")
+			emc.runDefaultCase()
+			emc.deleteIntermediates()
+			print(("="*100+"\n")*3)
+		
+			raw_input("Press any key to continue.\Next: background included but too few dataset.")
+			emc.runExample()
+			emc.deleteIntermediates()
+		 	print(("="*100+"\n")*3) 
+		
+			raw_input("Press any key to continue.\Next: background included now with 10 times more datasets.")
+			emc.runExample(numPatterns=100000)
+			emc.deleteIntermediates()
+		 	print(("="*100+"\n")*3) 
+	except:
+		pass
+	
