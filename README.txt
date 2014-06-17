@@ -17,6 +17,7 @@ Dependencies of this package:
 		gcc, standard C libraries (stdio, stdlib, time, math)  
 	to run Python file: 
 		python2.7 with matplotlib, numpy, scipy installed.
+		The functions here that use dictionaries are incompatible with Python3.
 	Note to Windows users:
 		You might want to download Enthought's python distribution (free for academic use). 
 		Then figure out how to compile C programs.

@@ -306,15 +306,15 @@ if __name__ == "__main__":
 			emc.deleteIntermediates()
 			print(("="*100+"\n")*3)
 		
-			raw_input("Press any key to continue.\Next: background included but too few dataset.")
+			raw_input("Press any key to continue. Next: background included but too few dataset.")
 			emc.runExample()
 			emc.deleteIntermediates()
-		 	print(("="*100+"\n")*3) 
+			print(("="*100+"\n")*3) 
 		
-			raw_input("Press any key to continue.\Next: background included now with 10 times more datasets.")
+			raw_input("Press any key to continue. Next: background included now with 10 times more datasets.")
 			emc.runExample(numPatterns=100000)
 			emc.deleteIntermediates()
-		 	print(("="*100+"\n")*3) 
+			print(("="*100+"\n")*3) 
 	except:
 		pass
 	
