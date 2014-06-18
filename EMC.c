@@ -512,7 +512,7 @@ void compress()
 	//Only orientation tomograms are rotated into canonical orientation and averaged into compressed model.
 	//Non-orientational background is simply updated into the background slice of compressed model.
 	int r, c, i, j, k, l, m, md;
-	for(i = 0; i < G.num_rlzt*G.conf_size; i++)
+	for(i = 0; i < G.num_conf*G.conf_size; i++)
 		{
 		G.conf_out[i] = 0.;
 		G.conf_out_wts[i] = 0.;
