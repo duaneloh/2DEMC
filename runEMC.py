@@ -12,6 +12,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.pylab as PL
 import struct
+from random import shuffle
 
 class runEMC(object):
 	def __init__(self):
@@ -123,7 +124,7 @@ class runEMC(object):
 			(numMultis,) = struct.unpack("H", bNumMultis)
 			bMultis = f.read(2*numMultis)
 			self.sparseData[dNum]['m'] = []
-			for m in range(numMultis/2):
+			for m in range(numMultis//2):
 				(mLoc,) = struct.unpack("H", bMultis[4*m:4*m+2])
 				(mPh,) = struct.unpack("H", bMultis[4*m+2:4*m+4])
 				(self.sparseData[dNum]['m']).append([mLoc, mPh])
@@ -134,7 +135,7 @@ class runEMC(object):
 		#This function should return an array
 		if len(self.sparseData) == 0:
 			res = self.sampleData()
-			if res is 1:
+			if res == 1:
 				return 
 		arr = N.zeros(self.len_*self.len_)
 		cD = self.sparseData[imgSlice]
@@ -147,10 +148,9 @@ class runEMC(object):
 	def showNineRandomData(self):
 		if len(self.sparseData) == 0:
 			res = self.sampleData()
-			if res is 1:
+			if res == 1:
 				return 
-		keys = self.sparseData.keys()
-		from random import shuffle
+		keys = list(self.sparseData.keys())
 		shuffle(keys)
 		fig,ax = plt.subplots(3,3, figsize=(9,10))
 		ccmap = PL.cm.get_cmap('bone', 2)
@@ -166,7 +166,7 @@ class runEMC(object):
 	def showAverageData(self):
 		if len(self.sparseData) == 0:
 			res = self.sampleData()
-			if res is 1:
+			if res == 1:
 				return 
 		keys = self.sparseData.keys()
 		hostArr = N.zeros((self.len_,self.len_))
